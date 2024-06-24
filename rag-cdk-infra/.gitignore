@@ -1,8 +1,10 @@
 *.js
 !jest.config.js
-*.d.ts
+rag-cdk-infra-stack.d.ts
 node_modules
 
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+
+"Zindagi is too small to cry over people, just be toxic and move on."

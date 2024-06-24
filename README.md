@@ -13,3 +13,12 @@ cdk bootstrap --region us-east-1
 cdk deploy
 
 RagCdkInfraStack
+
+# Ask:
+
+Query id to be random ?
+
+# TO DO:
+
+make get_query in handler like this:
+@app.get("/query/{query_id}")
