@@ -1,6 +1,9 @@
 *.pyc
 **/chroma
 *.DS_Store
+#Ignoring the rag-cdk-infra-stack.ts file:
+lib/
+!lib/rag-cdk-infra-stack.ts
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -17,7 +20,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
