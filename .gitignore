@@ -2,7 +2,7 @@
 **/chroma
 *.DS_Store
 #Ignoring the rag-cdk-infra-stack.ts file:
-lib/
+lib/*
 !lib/rag-cdk-infra-stack.ts
 # Byte-compiled / optimized / DLL files
 __pycache__/
