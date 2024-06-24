@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from rag_app.query_rag import QueryResponse, query_rag
+from mangum import Mangum
+
 import uvicorn
 
 app = FastAPI()
+handler = Mangum(app)
 
 class SubmitQueryRequest(BaseModel):
     query_text: str
