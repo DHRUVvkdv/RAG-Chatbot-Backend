@@ -1,0 +1,20 @@
+# Move all your source code, and other important stuff to a folder called image
+# Then move inside the image folder
+cd image
+# Build the docker image
+docker build --platform linux/amd64 -t aws_rag_app .
+
+# Runs the docker image:
+docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app app_api_handler.py
+
+# Make a new folder, in this case I called it "rag-cdk-infra"
+# The command will only work in an empty folder.
+cdk init app --language=typescript
+
+# If going to deploy the project for the first time run bootstrap below:
+cdk bootstrap --region us-east-1
+
+# Deploy the project/changes to AWS:
+cdk deploy
+
+Errors faced and ways to 

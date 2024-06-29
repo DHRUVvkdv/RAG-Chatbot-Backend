@@ -2,8 +2,6 @@
 
 making the backend server for AI assisted chatbot
 
-have text overlap and include file source link in metadata
-
 docker build --platform linux/amd64 -t aws_rag_app .
 docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app app_api_handler.py
 
@@ -32,6 +30,19 @@ Vector Database online? - Project will always have to be deployed again in order
 Link to Google Drive.
 Figure out Chunk size, and word count. and include links to drive.
 Front End?
+Size - repsonse size; 10 query;
+have text overlap and include file source link in metadata
+
+Optimize code, hardcore values to be pushed in Environment
+Testing:
+ask a llm, model and compare.
+
+Later Phase:
+Assign Query Id as a human redable query ID. (three words)
+WebSocket (very alter)
+Maybe use log instead of storing in DB?
+
+<!-- linux, apcahe, node.js, sql, postegresql, -->
 
 # Dessciption and how it works
 
