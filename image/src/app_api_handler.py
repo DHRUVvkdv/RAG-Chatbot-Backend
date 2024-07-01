@@ -2,22 +2,47 @@ import os
 import uvicorn
 import boto3
 import json
-
-from fastapi import FastAPI
+import lancedb
+import pyarrow as pa
+from fastapi import FastAPI, HTTPException
 from mangum import Mangum
 from pydantic import BaseModel
 from query_model import QueryModel
-from rag_app.query_rag import query_rag
+from rag_app.get_embedding_function import get_embedding_function
+from langchain.prompts import ChatPromptTemplate
+from langchain_aws import ChatBedrock
+import pandas as pd
+import logging
+import uuid
+import time
+from botocore.exceptions import ClientError
+
 
 WORKER_LAMBDA_NAME = os.environ.get("WORKER_LAMBDA_NAME", None)
+# BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
+	
+
 
 app = FastAPI()
 handler = Mangum(app)  # Entry point for AWS Lambda.
+
+PROMPT_TEMPLATE = """
+Answer the question based only on the following context:
+
+{context}
+
+---
+
+Answer the question based on the above context: {question}
+"""
 
 
 class SubmitQueryRequest(BaseModel):
     query_text: str
 
+class EmbeddingRequest(BaseModel):
+    sentences: list[str]
 
 @app.get("/")
 def index():
@@ -28,6 +53,177 @@ def index():
 def get_query_endpoint(query_id: str) -> QueryModel:
     query = QueryModel.get_item(query_id)
     return query
+
+@app.get("/get_s3")
+def get_s3_endpoint():
+    s3 = boto3.client("s3")
+    response = s3.list_buckets()
+    return response
+
+
+@app.post("/create_lance_db")
+def create_lance_db_endpoint():
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        LANCEDB_URI = f"s3://{S3_BUCKET}/data"
+        db = lancedb.connect(LANCEDB_URI)
+        
+        # Optionally, create a table here if needed
+        # For example:
+        db.create_table("try_table", data=[{"id": 1, "name": "test"}])
+        
+        return {"status": "success", "message": "Database connected successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create database: {str(e)}")
+
+@app.get("/check_lance_db")
+def check_lance_db_endpoint():
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        LANCEDB_URI = f"s3://{S3_BUCKET}/data"
+        db = lancedb.connect(LANCEDB_URI)
+        
+        # Check if the table exists
+        if "try_table" in db.table_names():
+            table = db.open_table("try_table")
+            row_count = len(table)
+            return {"status": "success", "message": f"Table 'try_table' exists with {row_count} rows"}
+        else:
+            return {"status": "failure", "message": "Table 'try_table' does not exist"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check database: {str(e)}")
+    
+@app.post("/create_embeddings")
+def create_embeddings_endpoint(request: EmbeddingRequest):
+    try:
+        # Use the same embedding function as in your Chroma setup
+        embedding_function = get_embedding_function()
+        
+        # Generate embeddings for the provided sentences
+        embedding_vectors = embedding_function.embed_documents(request.sentences)
+        
+        # Connect to the LanceDB
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        LANCEDB_URI = f"s3://{S3_BUCKET}/data"
+        db = lancedb.connect(LANCEDB_URI)
+        
+        # Define the schema using pyarrow
+        schema = pa.schema([
+            pa.field("id", pa.int64()),
+            pa.field("text", pa.string()),
+            pa.field("vector", pa.list_(pa.float32(), len(embedding_vectors[0])))
+        ])
+        
+        # Open or create the 'try_model' table
+        if "try_model" not in db.table_names():
+            table = db.create_table("try_model", schema=schema)
+        else:
+            table = db.open_table("try_model")
+        
+        # Get the current count of rows in the table
+        current_count = table.to_pandas().shape[0]
+        
+        # Create a DataFrame with the text and vector data
+        df = pd.DataFrame({
+            "id": range(current_count, current_count + len(request.sentences)),
+            "text": request.sentences,
+            "vector": embedding_vectors
+        })
+        
+        # Add the new embeddings to the table
+        table.add(df)
+        
+        return {"status": "success", "message": f"Added {len(request.sentences)} embeddings to try_model"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create embeddings: {str(e)}")
+    
+@app.post("/query_lance")
+def query_lance_endpoint(request: SubmitQueryRequest) -> QueryModel:
+    try:
+        # Connect to LanceDB
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        LANCEDB_URI = f"s3://{S3_BUCKET}/data"
+        db = lancedb.connect(LANCEDB_URI)
+        
+        # Open the 'try_model' table
+        table = db.open_table("try_model")
+        
+        # Get the embedding function
+        embedding_function = get_embedding_function()
+        
+        # Generate embedding for the query
+        query_embedding = embedding_function.embed_query(request.query_text)
+        
+        # Perform similarity search
+        results = table.search(query_embedding).limit(3).to_df()
+        
+        # Prepare context from search results
+        context_text = "\n\n---\n\n".join(results['text'].tolist())
+        
+        # Prepare prompt
+        prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+        prompt = prompt_template.format(context=context_text, question=request.query_text)
+        
+        # Generate response using ChatBedrock
+        model = ChatBedrock(model_id=BEDROCK_MODEL_ID)
+        response = model.invoke(prompt)
+        response_text = response.content
+        
+        # # Prepare sources
+        # sources = results['id'].tolist()
+        # Prepare sources - convert integer IDs to strings
+        sources = [str(id) for id in results['id'].tolist()]
+        
+        # Create QueryModel instance (without saving to DynamoDB)
+        new_query = QueryModel(
+            query_id=uuid.uuid4().hex,
+            create_time=int(time.time()),
+            query_text=request.query_text,
+            answer_text=response_text,
+            sources=sources,
+            is_complete=True
+        )
+        
+        logging.info(f"Query processed successfully: {new_query.query_id}")
+        
+        return new_query
+    except Exception as e:
+        logging.error(f"Failed to query LanceDB: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to query LanceDB: {str(e)}")
+
+@app.get("/list_pdfs")
+def list_pdfs_endpoint():
+    try:
+        # Get the S3 bucket name
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        
+        # Create an S3 client
+        s3_client = boto3.client('s3')
+        
+        # List objects in the bucket with the specified prefix
+        response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET,
+            Prefix='data/pdfs/'
+        )
+        
+        # Extract file names from the response
+        pdf_files = []
+        if 'Contents' in response:
+            for item in response['Contents']:
+                # Extract just the filename from the full path
+                filename = os.path.basename(item['Key'])
+                if filename.lower().endswith('.pdf'):
+                    pdf_files.append(filename)
+        
+        return {"status": "success", "pdf_files": pdf_files}
+    except ClientError as e:
+        error_message = f"Failed to list PDF files: {str(e)}"
+        logging.error(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {str(e)}"
+        logging.error(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
 
 
 @app.post("/submit_query")
