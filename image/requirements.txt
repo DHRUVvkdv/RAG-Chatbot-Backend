@@ -10,3 +10,5 @@ langchain-community==0.2.1
 lancedb==0.9.0
 pyarrow
 pandas
+pdfplumber
+PyPDF2
