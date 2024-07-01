@@ -50,6 +50,15 @@ Maybe use log instead of storing in DB?
 
 <!-- linux, apcahe, node.js, sql, postegresql, -->
 
+Jul 1, Mon:
+save the queries to DynamoDB
+dont make the embedding run again for documents
+
+- have a script which takes in argument on which documents to run it.
+
+Final:
+Clean the code, better organize.
+
 # Dessciption and how it works
 
 This is the RAG application backend for our chatbot. RAG stands for Retrieval-Augmented Generation.

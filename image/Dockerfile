@@ -19,4 +19,4 @@ ENV IS_USING_IMAGE_RUNTIME=True
 #Copy the source code
 COPY src/* ${LAMBDA_TASK_ROOT}
 COPY src/rag_app ${LAMBDA_TASK_ROOT}/rag_app
-COPY src/data/chroma ${LAMBDA_TASK_ROOT}/data/chroma
+# COPY src/data/chroma ${LAMBDA_TASK_ROOT}/data/chroma
