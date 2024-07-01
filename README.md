@@ -16,6 +16,11 @@ RagCdkInfraStack
 Enable Bedrcok services to be used - Error Faced
 thanks to : https://www.reddit.com/r/aws/comments/17f8rk6/how_long_does_it_take_to_gain_access_to_a_model/
 
+# Note
+
+Deleted the Data folder, if needed in future, this is the commit ID on branch 'lancedb' : 1e96f4f9fa23d67ebe0221cab12c34cca8689b37
+When deploying dont specify any build platform, lanceDB doesnt work otherwise.
+
 # Ask:
 
 Query id to be random ?
