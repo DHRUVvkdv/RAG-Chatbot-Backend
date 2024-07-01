@@ -54,7 +54,37 @@ Jul 1, Mon:
 save the queries to DynamoDB
 dont make the embedding run again for documents
 
-- have a script which takes in argument on which documents to run it.
+- test with 10 instances
+- docker ps -a
+- docker kill
+- give link of the data source - METADATA
+- have a script which takes in argument on which documents to run it - maybe sometimes it fail so you can reset.
+- have a processed file tracker
+- Time:
+  -- 5 seconds for Resume (1 page) - 131.7 kB - 9 chunks
+  -- 2min 50 sec for Lewas Systems Document () - 600kb - 98
+  -- 7 - 9 min - three files - 1.7 MB - 322
+
+  Time taken with two documents in DB - 15 sec
+  Time taken with three documents in DB - 30 sec
+
+3 seconds
+
+Questions tested:
+
+- OK ->
+  "How components are connected with each other?"
+  "What language is the API written in?"
+  "Tell me about Lohani research project"
+
+-Not OK ->
+"query_text": "Explain how the different components are connected in LEWAS"
+
+Feature:
+Summaries this document
+
+Warning:
+[2024-07-01T19:33:27Z WARN lance_table::io::commit] Using unsafe commit handler. Concurrent writes may result in data loss. Consider providing a commit handler that prevents conflicting writes.
 
 Final:
 Clean the code, better organize.

@@ -341,6 +341,92 @@ async def process_resume_pdf_endpoint():
     except Exception as e:
         logging.error(f"Failed to process resume PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process resume PDF: {str(e)}")
+    
+@app.post("/process_all_pdfs")
+async def process_all_pdfs_endpoint():
+    try:
+        # S3 bucket details
+        S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
+        PDF_PREFIX = "data/pdfs/"
+
+        # Connect to S3
+        s3 = boto3.client('s3')
+
+        # List all PDF files in the folder
+        response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=PDF_PREFIX)
+        pdf_files = [obj['Key'] for obj in response.get('Contents', []) if obj['Key'].lower().endswith('.pdf')]
+
+        # Connect to LanceDB
+        LANCEDB_URI = f"s3://{S3_BUCKET}/data"
+        db = lancedb.connect(LANCEDB_URI)
+
+        # Open or create the 'documents' table
+        if "documents" not in db.table_names():
+            schema = pa.schema([
+                pa.field("id", pa.string()),
+                pa.field("text", pa.string()),
+                pa.field("source", pa.string()),
+                pa.field("page", pa.int32()),
+                pa.field("vector", pa.list_(pa.float32(), 1536))  # Adjust dimension as needed
+            ])
+            table = db.create_table("documents", schema=schema)
+        else:
+            table = db.open_table("documents")
+
+        # Get embedding function
+        embedding_function = get_embedding_function()
+
+        total_chunks_added = 0
+
+        for pdf_key in pdf_files:
+            # Download the PDF file from S3
+            response = s3.get_object(Bucket=S3_BUCKET, Key=pdf_key)
+            pdf_content = response['Body'].read()
+
+            # Use BytesIO to create a file-like object
+            pdf_file = BytesIO(pdf_content)
+
+            # Read PDF using PyPDF2
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            
+            # Extract text from each page
+            documents = []
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                text = page.extract_text()
+                documents.append(Document(page_content=text, metadata={"page": page_num + 1}))
+
+            # Split the documents
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=600,
+                chunk_overlap=120,
+                length_function=len,
+                is_separator_regex=False,
+            )
+            chunks = text_splitter.split_documents(documents)
+
+            # Calculate chunk IDs
+            filename = os.path.basename(pdf_key)
+            chunks_with_ids = calculate_chunk_ids(chunks, filename)
+
+            # Add chunks to LanceDB
+            for chunk in chunks_with_ids:
+                embedding = embedding_function.embed_query(chunk.page_content)
+                table.add([{
+                    "id": chunk.metadata["id"],
+                    "text": chunk.page_content,
+                    "source": chunk.metadata["source"],
+                    "page": chunk.metadata.get("page", 0),
+                    "vector": embedding
+                }])
+
+            total_chunks_added += len(chunks)
+
+        return {"status": "success", "message": f"Processed and added {total_chunks_added} chunks from {len(pdf_files)} PDF files to LanceDB"}
+
+    except Exception as e:
+        logging.error(f"Failed to process PDFs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process PDFs: {str(e)}")
 
 def calculate_chunk_ids(chunks, filename):
     last_page_id = None
@@ -364,8 +450,10 @@ def calculate_chunk_ids(chunks, filename):
 
     return chunks  
 
-@app.post("/query_resume")
-async def query_resume_endpoint(request: SubmitQueryRequest) -> QueryModel:
+# @app.post("/query_resume")
+# async def query_resume_endpoint(request: SubmitQueryRequest) -> QueryModel:
+@app.post("/query_documents")
+async def query_documents_endpoint(request: SubmitQueryRequest) -> QueryModel:
     try:
         # Connect to LanceDB
         S3_BUCKET = os.environ.get("S3_BUCKET", "lewas-chatbot")
