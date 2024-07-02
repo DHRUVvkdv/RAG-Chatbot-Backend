@@ -60,13 +60,22 @@ dont make the embedding run again for documents
 - give link of the data source - METADATA
 - have a script which takes in argument on which documents to run it - maybe sometimes it fail so you can reset.
 - have a processed file tracker
+- fully functional with DynamoDB
+- delete embedding
+- edit a embedding (add metadata)
+- pretty slow
 - Time:
   -- 5 seconds for Resume (1 page) - 131.7 kB - 9 chunks
   -- 2min 50 sec for Lewas Systems Document () - 600kb - 98
   -- 7 - 9 min - three files - 1.7 MB - 322
+  -- 3 min 8 Sec - three files - 1.7 MB - 322 - Pinecone
 
   Time taken with two documents in DB - 15 sec
   Time taken with three documents in DB - 30 sec
+
+  Time taken with three documents in DB - 18 sec - Pinecone
+  Time taken with three documents in DB - 5 sec - Pinecone
+  Time taken with three documents in DB - 4 sec - Pinecone
 
 3 seconds
 
@@ -76,6 +85,9 @@ Questions tested:
   "How components are connected with each other?"
   "What language is the API written in?"
   "Tell me about Lohani research project"
+  "What research work has been conducted in LEWAS"
+  What is Dr Lohani's contribution to the lab?
+  what is the IJEE research project about?
 
 -Not OK ->
 "query_text": "Explain how the different components are connected in LEWAS"

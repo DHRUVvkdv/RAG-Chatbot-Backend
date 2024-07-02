@@ -12,3 +12,4 @@ pyarrow
 pandas
 pdfplumber
 PyPDF2
+pinecone-client
