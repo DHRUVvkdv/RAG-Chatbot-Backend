@@ -43,6 +43,10 @@ Optimize code, hardcore values to be pushed in Environment
 Testing:
 ask a llm, model and compare.
 
+Next Phase:
+
+- have the top k, model be determined by user or stored in a different file?
+
 Later Phase:
 Assign Query Id as a human redable query ID. (three words)
 WebSocket (very alter)
@@ -79,7 +83,10 @@ dont make the embedding run again for documents
 
 3 seconds
 
-Questions tested:
+- Jul 2, Mon:
+  -- make dynamodb utils
+  -- parralely convert to embeddings
+  Questions tested:
 
 - OK ->
   "How components are connected with each other?"
@@ -88,6 +95,7 @@ Questions tested:
   "What research work has been conducted in LEWAS"
   What is Dr Lohani's contribution to the lab?
   what is the IJEE research project about?
+  "What different departments LEWAS comprise of?"
 
 -Not OK ->
 "query_text": "Explain how the different components are connected in LEWAS"
@@ -111,6 +119,10 @@ We have the populate_database.py file which is run initilaly to create the vecto
 # populate_database.py
 
 This utility script populates a Chroma vector database with text chunks extracted from PDF documents. It's designed for a RAG (Retrieval-Augmented Generation) application.
+
+# Challenges:
+
+- if you dont have get error from streamlit / aws about not giving api key, go their environment and provide the key there.
 
 ## Features:
 

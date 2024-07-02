@@ -69,6 +69,18 @@ def list_processed_files_endpoint():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/list_processed_files")
+def list_processed_files_endpoint():
+    try:
+        processed_files = list_processed_files()
+        return {
+            "status": "success",
+            "processed_files": processed_files,
+            "total_processed_files": len(processed_files)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = 8000

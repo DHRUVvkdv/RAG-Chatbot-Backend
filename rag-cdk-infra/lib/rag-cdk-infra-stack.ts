@@ -25,6 +25,13 @@ export class RagCdkInfraStack extends cdk.Stack {
     // Using the table already created in the previous step.
     const ragQueryTable = Table.fromTableName(this, "ExistingQueriesTable", "RagCdkInfraStack-QueriesTable7395E8FA-17BGT2YQ1QX1F");
 
+    // Create a new DynamoDB table for processed files
+    const processedFilesTable = new Table(this, "ProcessedFilesTable", {
+      tableName: "lewas-chatbot-processed-files",
+      partitionKey: { name: "filename", type: AttributeType.STRING },
+      billingMode: BillingMode.PAY_PER_REQUEST,
+    });
+
     // Lambda function (image) to handle the worker logic (run RAG/AI model).
     const workerImageCode = DockerImageCode.fromImageAsset("../image", {
       cmd: ["app_work_handler.handler"]
@@ -36,6 +43,7 @@ export class RagCdkInfraStack extends cdk.Stack {
       architecture: Architecture.ARM_64, // Needs to be the same as the image.
       environment: {
         TABLE_NAME: ragQueryTable.tableName,
+        PROCESSED_FILES_TABLE_NAME: processedFilesTable.tableName,
       },
     });
 
@@ -122,6 +130,8 @@ export class RagCdkInfraStack extends cdk.Stack {
     // Grant permissions for all resources to work together.
     ragQueryTable.grantReadWriteData(workerFunction);
     ragQueryTable.grantReadWriteData(apiFunction);
+    processedFilesTable.grantReadWriteData(workerFunction);
+    processedFilesTable.grantReadWriteData(apiFunction);
     workerFunction.grantInvoke(apiFunction);
     workerFunction.role?.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess")

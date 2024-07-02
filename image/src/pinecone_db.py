@@ -11,11 +11,17 @@ import time
 from s3_utils import get_pdf_from_s3, list_pdfs_in_s3
 from pdf_utils import process_pdf
 import json
+import boto3
+from botocore.exceptions import ClientError
+
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "chatbot-index")
-# BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
-BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
+# BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('lewas-chatbot-processed-files')
 
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
@@ -77,7 +83,7 @@ def initialize_pinecone():
         if PINECONE_INDEX_NAME not in pc.list_indexes().names():
             pc.create_index(
                 name=PINECONE_INDEX_NAME,
-                dimension=1536,  # Adjust this to match your embedding dimension
+                dimension=1536,  
                 metric="cosine",
                 spec=ServerlessSpec(
                     cloud="aws",
@@ -105,7 +111,7 @@ def create_embeddings(sentences):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create embeddings: {str(e)}")
 
-def query_pinecone(query_text, top_k=5):
+def query_pinecone(query_text, top_k=3):
     try:
         index = pc.Index(PINECONE_INDEX_NAME)
         
@@ -192,6 +198,8 @@ def process_pdf_file(pdf_key):
             ))
 
         index.upsert(vectors=vectors_to_upsert)
+        # Add the processed file to DynamoDB
+        add_processed_file(pdf_key)
         return len(chunks)
     except Exception as e:
         logging.error(f"Failed to process PDF {pdf_key}: {str(e)}")
@@ -211,33 +219,12 @@ def process_all_pdfs():
         for pdf_key in available_pdfs:
             pdf_name = pdf_key.split('/')[-1]  # Extract filename from the full path
             if pdf_name not in processed_files:
-                try:
-                    pdf_content = get_pdf_from_s3(pdf_name)  # Note: get_pdf_from_s3 expects just the filename
-                    chunks = process_pdf(pdf_content, pdf_name)
-
-                    index = pc.Index(PINECONE_INDEX_NAME)
-                    embedding_function = get_embedding_function()
-
-                    vectors_to_upsert = []
-                    for chunk in chunks:
-                        embedding = embedding_function.embed_query(chunk.page_content)
-                        vectors_to_upsert.append((
-                            chunk.metadata["id"],
-                            embedding,
-                            {
-                                "text": chunk.page_content,
-                                "source": chunk.metadata["source"],
-                                "page": chunk.metadata.get("page", 0)
-                            }
-                        ))
-
-                    index.upsert(vectors=vectors_to_upsert)
-                    
-                    total_chunks_added += len(chunks)
+                chunks_added = process_pdf_file(pdf_name)
+                if chunks_added > 0:
+                    total_chunks_added += chunks_added
                     newly_processed_files += 1
-                    newly_processed_file_details.append(f"{pdf_name}: {len(chunks)} chunks")
-                except Exception as e:
-                    logging.error(f"Failed to process PDF {pdf_name}: {str(e)}")
+                    newly_processed_file_details.append(f"{pdf_name}: {chunks_added} chunks")
+                else:
                     failed_files.append(pdf_name)
 
         return {
@@ -255,3 +242,24 @@ def process_all_pdfs():
     except Exception as e:
         logging.error(f"Failed to process PDFs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process PDFs: {str(e)}")
+    
+def list_processed_files():
+    try:
+        response = table.scan()
+        processed_files = [item['filename'] for item in response['Items']]
+        
+        return processed_files
+    except ClientError as e:
+        logging.error(f"Failed to list processed files from DynamoDB: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list processed files: {str(e)}")
+    
+def add_processed_file(filename):
+    try:
+        table.put_item(
+            Item={
+                'filename': filename
+            }
+        )
+    except ClientError as e:
+        logging.error(f"Failed to add processed file to DynamoDB: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add processed file: {str(e)}")
