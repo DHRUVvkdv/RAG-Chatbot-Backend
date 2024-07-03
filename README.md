@@ -101,6 +101,7 @@ dont make the embedding run again for documents
   Done:
   Made feature to keep track of processed files, deployed to AWS, source as a google link set up,
   setup local api to download all ids and name, made it usable by local chatbot to store in the memory.
+  feat: added drive metadata to the sources, added API adding drive links, for missing driveslinks, for corrupted drive links, modified to use SERVICE URL for Docker
 
   Questions tested:
 
