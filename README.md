@@ -23,7 +23,8 @@ When deploying dont specify any build platform, lanceDB doesnt work otherwise.
 
 # Ask:
 
-Query id to be random ?
+Query id to be random - YES
+Meta data to be stored with every chunk?
 
 # TO DO:
 
@@ -73,6 +74,7 @@ dont make the embedding run again for documents
   -- 2min 50 sec for Lewas Systems Document () - 600kb - 98
   -- 7 - 9 min - three files - 1.7 MB - 322
   -- 3 min 8 Sec - three files - 1.7 MB - 322 - Pinecone
+  How_sys_network_works.pdf - 1.0 MB - 7 pages - 22 chunks - 20 seconds
 
   Time taken with two documents in DB - 15 sec
   Time taken with three documents in DB - 30 sec
@@ -86,6 +88,20 @@ dont make the embedding run again for documents
 - Jul 2, Mon:
   -- make dynamodb utils
   -- parralely convert to embeddings
+  -- Delete certain embeddings
+  -- what is the same document existed before
+  -- modify metadata
+  -- upload to DynamoDB - DONE
+  -- return or store what chunks were used
+  -- What happens when mutliple files with same name in different parts?
+  -- output size (from model)
+  -- update_drive_link_for_file - for manual updation
+  -- List number fo vectors of a given document
+
+  Done:
+  Made feature to keep track of processed files, deployed to AWS, source as a google link set up,
+  setup local api to download all ids and name, made it usable by local chatbot to store in the memory.
+
   Questions tested:
 
 - OK ->
@@ -96,9 +112,11 @@ dont make the embedding run again for documents
   What is Dr Lohani's contribution to the lab?
   what is the IJEE research project about?
   "What different departments LEWAS comprise of?"
+  list different sensors in LEWAS Lab.
 
 -Not OK ->
 "query_text": "Explain how the different components are connected in LEWAS"
+how are different components connected in LEWAS Lab?
 
 Feature:
 Summaries this document

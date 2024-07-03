@@ -9,8 +9,14 @@ def process_pdf(pdf_file, filename):
     for page_num in range(len(pdf_reader.pages)):
         page = pdf_reader.pages[page_num]
         text = page.extract_text()
-        documents.append(Document(page_content=text, metadata={"page": page_num + 1}))
-
+        documents.append(Document(
+            page_content=text, 
+            metadata={
+                "page": page_num + 1,
+                "source": filename,  
+            }
+        ))
+    
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=600,
         chunk_overlap=120,
@@ -18,7 +24,7 @@ def process_pdf(pdf_file, filename):
         is_separator_regex=False,
     )
     chunks = text_splitter.split_documents(documents)
-
+    
     return calculate_chunk_ids(chunks, filename)
 
 def calculate_chunk_ids(chunks, filename):
