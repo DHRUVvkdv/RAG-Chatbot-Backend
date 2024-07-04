@@ -122,6 +122,7 @@ dont make the embedding run again for documents
     -- Organize DB
     -- Store chunks of text to DB for now - for later maybe have an API to get the specific chunk
     -- Figure out chunk ID
+    -- implement retry for pinecone db
 
 - Research part:
 
