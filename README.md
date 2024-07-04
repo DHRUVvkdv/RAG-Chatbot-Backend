@@ -21,6 +21,18 @@ thanks to : https://www.reddit.com/r/aws/comments/17f8rk6/how_long_does_it_take_
 Deleted the Data folder, if needed in future, this is the commit ID on branch 'lancedb' : 1e96f4f9fa23d67ebe0221cab12c34cca8689b37
 When deploying dont specify any build platform, lanceDB doesnt work otherwise.
 
+# Future
+
+- Caching:
+  Implement DAX (DynamoDB Accelerator) or ElastiCache to cache frequent queries and reduce database load.
+  - User Analytics:
+    Develop a background process to analyze user queries and generate insights (e.g., most common topics, peak usage times).
+- Tagging System: Add a 'Tags' field to the Queries table to categorize queries, enabling better organization and search capabilities.
+  - Collaboration Feature:
+    Add a 'SharedWith' field in the Queries table to allow users to share specific queries with others.
+  - Pagination:
+    Implement pagination in your query history API to handle large volumes of data efficiently.
+
 # Ask:
 
 Query id to be random - YES
@@ -33,12 +45,12 @@ make get_query in handler like this:
 
 Have user authentication.
 Make a new project for LEWAS?
-Vector Database online? - Project will always have to be deployed again in order to work.
+Vector Database online? - Project will always have to be deployed again in order to work - DONE
 Link to Google Drive.
-Figure out Chunk size, and word count. and include links to drive.
-Front End?
-Size - repsonse size; 10 query;
-have text overlap and include file source link in metadata
+Figure out Chunk size, and word count, Size - repsonse size; 10 query, have text overlap - Research Part
+and include links to drive - DONE
+Front End? - DONE (Streamlit)
+and include file source link in metadata - Done
 
 Optimize code, hardcore values to be pushed in Environment
 Testing:
@@ -103,6 +115,19 @@ dont make the embedding run again for documents
   setup local api to download all ids and name, made it usable by local chatbot to store in the memory.
   feat: added drive metadata to the sources, added API adding drive links, for missing driveslinks, for corrupted drive links, modified to use SERVICE URL for Docker
 
+  - July 3, Wed:
+    -- meeting
+    -- researching about user authentication
+    -- store every query to DB
+    -- Organize DB
+    -- Store chunks of text to DB for now - for later maybe have an API to get the specific chunk
+    -- Figure out chunk ID
+
+- Research part:
+
+  - User Analytics:
+    -- Develop a background process to analyze user queries and generate insights (e.g., most common topics, peak usage times).
+
   Questions tested:
 
 - OK ->
@@ -138,6 +163,48 @@ We have the populate_database.py file which is run initilaly to create the vecto
 # populate_database.py
 
 This utility script populates a Chroma vector database with text chunks extracted from PDF documents. It's designed for a RAG (Retrieval-Augmented Generation) application.
+
+# Storage:
+
+- PineconeDB - Stores the vector embeddings
+- S3 - stores all the PDFs
+- DynamoDB ->
+  -- one table stores all the file names which are processed
+  -- other table stores all the queries ->
+  -- query-id, answer text (response to show to user), create_time, is_complete, query_text (Question), sources (list all of the resources used).
+  - THoughts:
+    -- User stored somewhere where I store how many times/tokens the used so far and tokens/times for the day - not clear how to implement this
+
+# User Authentication :
+
+- Thoughts:
+  -- Restrict to only vt.edu OR College (.edu)
+  -- DynamoDB Streams
+  -- Optimizing Data Retrieval: Use a GSI (Global Secondary Index) on user_id and create_time to efficiently retrieve queries for a specific user sorted by time, Use GSIs (Global Secondary Indexes):
+  Create a GSI on the Queries table with CreateTime as the partition key to enable time-based queries across all users.
+  -- Query Statistics: Track the number of queries each user makes and their completion status to generate usage statistics.
+  -- Implement TTL (Time to Live):
+  Use TTL on the DailyUsage table to automatically delete old daily records, saving storage and reducing costs.
+  -- Add a 'UserFeedback' field to the Queries table to store user ratings or comments on responses.
+  -- add two new tables:
+  --- User Table (new):
+
+          UserID (from Cognito)
+          TotalTokensUsed
+          TotalInteractions
+          LastUsedDate
+          LastQueryID (for quick access to the most recent query)
+
+--- DailyUsage Table (new):
+
+      UserID
+      Date
+      TokensUsedToday
+      InteractionsToday
+
+- Streamlit authenticator
+- AWS Cognito with Streamlit Authentication Libraries
+  will go ahead with AWS Cognito with link to DynamoDB.
 
 # Challenges:
 
