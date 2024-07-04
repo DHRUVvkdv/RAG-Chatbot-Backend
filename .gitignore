@@ -1,5 +1,4 @@
 *.pyc
-**/chroma
 *.DS_Store
 #Ignoring the rag-cdk-infra-stack.ts file:
 lib/*

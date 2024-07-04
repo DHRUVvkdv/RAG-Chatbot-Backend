@@ -9,6 +9,8 @@ import {
   Architecture,
 } from "aws-cdk-lib/aws-lambda";
 import { ManagedPolicy } from "aws-cdk-lib/aws-iam";
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class RagCdkInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -23,49 +25,113 @@ export class RagCdkInfraStack extends cdk.Stack {
     // Using the table already created in the previous step.
     const ragQueryTable = Table.fromTableName(this, "ExistingQueriesTable", "RagCdkInfraStack-QueriesTable7395E8FA-17BGT2YQ1QX1F");
 
+    // Create a new DynamoDB table for processed files
+    const processedFilesTable = new Table(this, "ProcessedFilesTable", {
+      tableName: "lewas-chatbot-processed-files",
+      partitionKey: { name: "filename", type: AttributeType.STRING },
+      billingMode: BillingMode.PAY_PER_REQUEST,
+    });
+
     // Lambda function (image) to handle the worker logic (run RAG/AI model).
     const workerImageCode = DockerImageCode.fromImageAsset("../image", {
-      cmd: ["app_work_handler.handler"],
-      buildArgs: {
-        platform: "linux/amd64", // Needs x86_64 architecture for pysqlite3-binary.
-      },
+      cmd: ["app_work_handler.handler"]
     });
     const workerFunction = new DockerImageFunction(this, "RagWorkerFunction", {
       code: workerImageCode,
       memorySize: 512, // Increase this if you need more memory.
       timeout: cdk.Duration.seconds(60), // Increase this if you need more time.
-      architecture: Architecture.X86_64, // Needs to be the same as the image.
+      architecture: Architecture.ARM_64, // Needs to be the same as the image.
       environment: {
         TABLE_NAME: ragQueryTable.tableName,
+        PROCESSED_FILES_TABLE_NAME: processedFilesTable.tableName,
       },
     });
 
     // Function to handle the API requests. Uses same base image, but different handler.
     const apiImageCode = DockerImageCode.fromImageAsset("../image", {
-      cmd: ["app_api_handler.handler"],
-      buildArgs: {
-        platform: "linux/amd64",
-      },
+      cmd: ["app_api_handler.handler"]
     });
     const apiFunction = new DockerImageFunction(this, "ApiFunc", {
       code: apiImageCode,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
-      architecture: Architecture.X86_64,
+      architecture: Architecture.ARM_64,
       environment: {
         TABLE_NAME: ragQueryTable.tableName,
         WORKER_LAMBDA_NAME: workerFunction.functionName,
       },
     });
 
+    // Grant Bedrock permissions to the API function
+    // const bedrockPolicy = new iam.PolicyStatement({
+    //   effect: iam.Effect.ALLOW,
+    //   actions: [
+    //     'bedrock:InvokeModel',
+    //     'bedrock:ListFoundationModels',
+    //     'bedrock:GetFoundationModel'
+    //   ],
+    //   resources: ['*']  // You might want to restrict this to specific model ARNs
+    // });
+
+    // apiFunction.addToRolePolicy(bedrockPolicy);
+    apiFunction.role?.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess")
+    );
+
+
     // Public URL for the API function.
     const functionUrl = apiFunction.addFunctionUrl({
       authType: FunctionUrlAuthType.NONE,
     });
 
+    // Pemission for the API fucntion to access the S3 bucket.
+    // Reference the existing S3 bucket
+    const existingBucket = s3.Bucket.fromBucketName(this, 'ExistingBucket', 'lewas-chatbot');
+
+    // Grant read/write permissions to the API function
+    existingBucket.grantReadWrite(apiFunction);
+
+    // Grant read/write permissions to the worker function
+    existingBucket.grantReadWrite(workerFunction);
+
+    // Add S3 environment variables to both functions
+    apiFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot');
+    workerFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot');
+
+    apiFunction.role?.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
+    );
+    workerFunction.role?.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
+    );
+
+    const lanceDbPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        's3:GetBucketLocation',
+        's3:ListBucket',
+        's3:ListBucketMultipartUploads',
+        's3:ListMultipartUploadParts',
+        's3:AbortMultipartUpload',
+        's3:CreateMultipartUpload',
+        's3:PutObject',
+        's3:GetObject',
+        's3:DeleteObject'
+      ],
+      resources: [
+        `arn:aws:s3:::${existingBucket.bucketName}`,
+        `arn:aws:s3:::${existingBucket.bucketName}/*`
+      ]
+    });
+    
+    apiFunction.addToRolePolicy(lanceDbPolicy);
+    workerFunction.addToRolePolicy(lanceDbPolicy);
+
     // Grant permissions for all resources to work together.
     ragQueryTable.grantReadWriteData(workerFunction);
     ragQueryTable.grantReadWriteData(apiFunction);
+    processedFilesTable.grantReadWriteData(workerFunction);
+    processedFilesTable.grantReadWriteData(apiFunction);
     workerFunction.grantInvoke(apiFunction);
     workerFunction.role?.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess")
