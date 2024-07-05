@@ -18,8 +18,6 @@ class QueryModel(BaseModel):
     sources: List[str] = Field(default_factory=list)
     is_complete: bool = False
 
-
-    
     @classmethod
     def get_table(cls: "QueryModel") -> boto3.resource:
         dynamodb = boto3.resource("dynamodb")

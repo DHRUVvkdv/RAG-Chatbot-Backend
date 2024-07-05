@@ -5,7 +5,7 @@ cd image
 docker build --platform linux/amd64 -t aws_rag_app .
 
 # Runs the docker image:
-docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app app_api_handler.py
+docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app main.py
 
 # Make a new folder, in this case I called it "rag-cdk-infra"
 # The command will only work in an empty folder.

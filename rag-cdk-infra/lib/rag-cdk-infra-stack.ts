@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-
+import * as fs from 'fs';
+import * as path from 'path';
 import { AttributeType, BillingMode, Table } from "aws-cdk-lib/aws-dynamodb";
 import {
   DockerImageFunction,
@@ -15,6 +16,13 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 export class RagCdkInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+
+    // Get the environment variables from the Python config file.
+    const pineconeApiKey = process.env.PINECONE_API_KEY;
+    if (!pineconeApiKey) {
+      throw new Error("PINECONE_API_KEY environment variable is not set");
+    }
 
     // Create a DynamoDB table to store the query data and results.
     // const ragQueryTable = new Table(this, "QueriesTable", {
@@ -32,24 +40,9 @@ export class RagCdkInfraStack extends cdk.Stack {
       billingMode: BillingMode.PAY_PER_REQUEST,
     });
 
-    // Lambda function (image) to handle the worker logic (run RAG/AI model).
-    const workerImageCode = DockerImageCode.fromImageAsset("../image", {
-      cmd: ["app_work_handler.handler"]
-    });
-    const workerFunction = new DockerImageFunction(this, "RagWorkerFunction", {
-      code: workerImageCode,
-      memorySize: 512, // Increase this if you need more memory.
-      timeout: cdk.Duration.seconds(60), // Increase this if you need more time.
-      architecture: Architecture.ARM_64, // Needs to be the same as the image.
-      environment: {
-        TABLE_NAME: ragQueryTable.tableName,
-        PROCESSED_FILES_TABLE_NAME: processedFilesTable.tableName,
-      },
-    });
-
     // Function to handle the API requests. Uses same base image, but different handler.
     const apiImageCode = DockerImageCode.fromImageAsset("../image", {
-      cmd: ["app_api_handler.handler"]
+      cmd: ["main.handler"]
     });
     const apiFunction = new DockerImageFunction(this, "ApiFunc", {
       code: apiImageCode,
@@ -57,8 +50,9 @@ export class RagCdkInfraStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       architecture: Architecture.ARM_64,
       environment: {
+        ...this.getConfigFromPython(),
         TABLE_NAME: ragQueryTable.tableName,
-        WORKER_LAMBDA_NAME: workerFunction.functionName,
+        PINECONE_API_KEY: pineconeApiKey,
       },
     });
 
@@ -91,17 +85,11 @@ export class RagCdkInfraStack extends cdk.Stack {
     // Grant read/write permissions to the API function
     existingBucket.grantReadWrite(apiFunction);
 
-    // Grant read/write permissions to the worker function
-    existingBucket.grantReadWrite(workerFunction);
 
     // Add S3 environment variables to both functions
     apiFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot');
-    workerFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot');
 
     apiFunction.role?.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
-    );
-    workerFunction.role?.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
     );
 
@@ -125,21 +113,37 @@ export class RagCdkInfraStack extends cdk.Stack {
     });
     
     apiFunction.addToRolePolicy(lanceDbPolicy);
-    workerFunction.addToRolePolicy(lanceDbPolicy);
 
     // Grant permissions for all resources to work together.
-    ragQueryTable.grantReadWriteData(workerFunction);
     ragQueryTable.grantReadWriteData(apiFunction);
-    processedFilesTable.grantReadWriteData(workerFunction);
     processedFilesTable.grantReadWriteData(apiFunction);
-    workerFunction.grantInvoke(apiFunction);
-    workerFunction.role?.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess")
-    );
 
     // Output the URL for the API function.
     new cdk.CfnOutput(this, "FunctionUrl", {
       value: functionUrl.url,
     });
   }
+
+  private getConfigFromPython(): { [key: string]: string } {
+    const configPath = path.join(__dirname, '..', '..', 'image','src', 'config.py');
+    const configContent = fs.readFileSync(configPath, 'utf8');
+  
+    const envVars: { [key: string]: string } = {};
+    const lines = configContent.split('\n');
+    
+    const reservedVars = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION'];
+    
+    for (const line of lines) {
+      const match = line.match(/(\w+)\s*=\s*os\.getenv\("(\w+)"(?:,\s*"([^"]*)")?\)/);
+      if (match) {
+        const [, varName, envName, defaultValue] = match;
+        if (!reservedVars.includes(envName)) {
+          envVars[envName] = process.env[envName] || defaultValue || '';
+        }
+      }
+    }
+  
+    return envVars;
+  }
+
 }

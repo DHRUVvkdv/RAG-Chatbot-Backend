@@ -4,7 +4,8 @@ making the backend server for AI assisted chatbot
 
 docker build --platform linux/amd64 -t aws_rag_app .
 docker build -t aws_rag_app .
-docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app app_api_handler.py
+docker run --rm -p 8000:8000 --add-host=host.docker.internal:host-gateway --entrypoint python --env-file .env aws_rag_app main.py
+docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app main.py
 
 cdk init app --language=typescript
 
@@ -15,6 +16,9 @@ RagCdkInfraStack
 
 Enable Bedrcok services to be used - Error Faced
 thanks to : https://www.reddit.com/r/aws/comments/17f8rk6/how_long_does_it_take_to_gain_access_to_a_model/
+
+Errors faced:
+you get 502 error - Pinecone API not provided go to Lambda Config and add key over there or use AWS Secret Manager
 
 # Note
 
