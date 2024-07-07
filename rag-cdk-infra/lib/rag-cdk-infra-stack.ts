@@ -23,6 +23,10 @@ export class RagCdkInfraStack extends cdk.Stack {
     if (!pineconeApiKey) {
       throw new Error("PINECONE_API_KEY environment variable is not set");
     }
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY environment variable is not set");
+    }
 
     // Create a DynamoDB table to store the query data and results.
     // const ragQueryTable = new Table(this, "QueriesTable", {
@@ -50,9 +54,9 @@ export class RagCdkInfraStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       architecture: Architecture.ARM_64,
       environment: {
-        ...this.getConfigFromPython(),
         TABLE_NAME: ragQueryTable.tableName,
         PINECONE_API_KEY: pineconeApiKey,
+        API_KEY: apiKey
       },
     });
 

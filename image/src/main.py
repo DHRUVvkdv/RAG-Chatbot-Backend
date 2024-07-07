@@ -1,6 +1,9 @@
 import os
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
+from utils.api_key_middleware import ApiKeyMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.docs import get_swagger_ui_html
 from mangum import Mangum
 from pydantic import BaseModel
 from models.query import QueryModel
@@ -23,6 +26,27 @@ from pinecone import PineconeException
 WORKER_LAMBDA_NAME = os.environ.get("WORKER_LAMBDA_NAME", None)
 
 app = FastAPI()
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="LEWAS-Chabot API",
+        version="1.0.0",
+        description="API for the LEWAS Chatbot project",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "API-Key"}
+    }
+    openapi_schema["security"] = [{"ApiKeyAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+app.add_middleware(ApiKeyMiddleware)
 handler = Mangum(app)  # Entry point for AWS Lambda.
 
 

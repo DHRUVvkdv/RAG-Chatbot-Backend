@@ -36,6 +36,7 @@ When deploying dont specify any build platform, lanceDB doesnt work otherwise.
     Add a 'SharedWith' field in the Queries table to allow users to share specific queries with others.
   - Pagination:
     Implement pagination in your query history API to handle large volumes of data efficiently.
+    - User management (who can access the API)
 
 # Ask:
 
@@ -68,6 +69,10 @@ Later Phase:
 Assign Query Id as a human redable query ID. (three words)
 WebSocket (very alter)
 Maybe use log instead of storing in DB?
+
+Potential:
+
+## Load Testing
 
 <!-- linux, apcahe, node.js, sql, postegresql, -->
 
@@ -127,6 +132,14 @@ dont make the embedding run again for documents
     -- Store chunks of text to DB for now - for later maybe have an API to get the specific chunk
     -- Figure out chunk ID
     -- implement retry for pinecone db
+
+  - July 4, Wed:
+    -- Organised the project with using config and env files, also
+
+  - July 5, Wed:
+    -- Store the user queries along with sources in DB.
+    -- Use variables from the config file.
+    -- The chat doesn't show older messages' sources.
 
 - Research part:
 
