@@ -37,6 +37,7 @@ When deploying dont specify any build platform, lanceDB doesnt work otherwise.
   - Pagination:
     Implement pagination in your query history API to handle large volumes of data efficiently.
     - User management (who can access the API)
+    - Use Pinecone Inference
 
 # Ask:
 
@@ -73,6 +74,8 @@ Maybe use log instead of storing in DB?
 Potential:
 
 ## Load Testing
+
+Corrective RAG using Tally - https://github.com/run-llama/llama-agents/blob/main/examples/corrective_rag.ipynb
 
 <!-- linux, apcahe, node.js, sql, postegresql, -->
 
@@ -140,6 +143,19 @@ dont make the embedding run again for documents
     -- Store the user queries along with sources in DB.
     -- Use variables from the config file.
     -- The chat doesn't show older messages' sources.
+
+    - July 11, Thursday:
+      -- chunk size, overlap top k all in the config file
+      -- use config file
+      -- make a new file for: get_google_drive_link_pdf() in pinecone_service
+      -- efficiency: You can upsert data in batches for improved efficiency (recommended limit is 100 vectors per request).
+      -- can we remove this in pinecone_service: metadata = chunk.metadata.copy() # Start with the existing metadata
+      -- do we need this: "text": chunk.page_content, in metadata?
+      -- upsert function has the following:
+      --- batch_size (optional): This specifies the number of vectors to upsert in each batch. If not specified, all vectors will be upserted in a single batch.
+      ---show_progress (optional): If set to True, this shows a progress bar using tqdm.
+      --- create UI for uploading PDFs, showcase this in the Poster
+      -- Feedback from user......
 
 - Research part:
 
