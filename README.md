@@ -157,6 +157,11 @@ dont make the embedding run again for documents
       --- create UI for uploading PDFs, showcase this in the Poster
       -- Feedback from user......
 
+      - July 12, Friday:
+        -- will check later but this is it i believe: results = index.query(
+        vector=query_embedding, top_k=top_k, include_metadata=True
+        ), when top_k (my provided value) is less than the available related approximate neighbours
+
 - Research part:
 
   - User Analytics:
