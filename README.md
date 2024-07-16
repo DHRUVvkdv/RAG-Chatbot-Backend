@@ -161,6 +161,11 @@ dont make the embedding run again for documents
         -- will check later but this is it i believe: results = index.query(
         vector=query_embedding, top_k=top_k, include_metadata=True
         ), when top_k (my provided value) is less than the available related approximate neighbours
+        - July 13:
+          dont revel personal adress, credit card, - should mask PII for people
+      - like addressess and credit card infor etc
+      - July 14
+        -- What happens in drive when files with the same name ?
 
 - Research part:
 
@@ -179,8 +184,14 @@ dont make the embedding run again for documents
   "What different departments LEWAS comprise of?"
   list different sensors in LEWAS Lab.
 
+  jULY 16, 4:02 AM (4 documents)
+  explain about Acute Chloride Toxicity in LEWAS Lab
+  explain effect of stormwater on LEWAS
+  explain LEWAS Lab
+  explain all Dr Lohani's work
+
 -Not OK ->
-"query_text": "Explain how the different components are connected in LEWAS"
+"query_text": "Explain how the different components are connected in LEWAS" (correct as of Tue Jul 16 04:21:20 2024)
 how are different components connected in LEWAS Lab?
 
 Feature:

@@ -17,15 +17,17 @@ from pinecone import PineconeException
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "chatbot-index")
-BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
-# BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+# BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
+BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 
 # Use host.docker.internal to refer to the host machine from within the container
 FILE_ID_SERVICE_URL = "http://host.docker.internal:8001"
 
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("lewas-chatbot-processed-files")
+processedFilesTable = dynamodb.Table("lewas-chatbot-processed-files")
+queriesTable = dynamodb.Table("RagCdkInfraStack-QueriesTable7395E8FA-17BGT2YQ1QX1F")
+
 
 PROMPT_TEMPLATE = """
 Answer the question based only on the following context:
@@ -131,7 +133,7 @@ def create_embeddings(sentences):
         )
 
 
-def query_pinecone(query_text, top_k=3):
+def query_pinecone(query_text, top_k=7):
     try:
         index = pc.Index(PINECONE_INDEX_NAME)
 
@@ -167,6 +169,8 @@ def query_pinecone(query_text, top_k=3):
             sources=sources,
             is_complete=True,
         )
+        # queriesTable.put_item(new_query)
+        queriesTable.put_item(Item=new_query.model_dump())
 
         logging.info(f"Query processed successfully: {new_query.query_id}")
 
@@ -290,7 +294,7 @@ def process_all_pdfs():
 
 def list_processed_files():
     try:
-        response = table.scan()
+        response = processedFilesTable.scan()
         processed_files = [item["filename"] for item in response["Items"]]
 
         return processed_files
@@ -303,7 +307,7 @@ def list_processed_files():
 
 def add_processed_file_dynamodb(filename):
     try:
-        table.put_item(Item={"filename": filename})
+        processedFilesTable.put_item(Item={"filename": filename})
     except ClientError as e:
         logging.error(f"Failed to add processed file to DynamoDB: {str(e)}")
         raise HTTPException(
