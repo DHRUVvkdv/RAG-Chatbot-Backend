@@ -1,5 +1,7 @@
 *.pyc
 *.DS_Store
+working.txt
+commonissues.txt
 #Ignoring the rag-cdk-infra-stack.ts file:
 lib/*
 !lib/rag-cdk-infra-stack.ts

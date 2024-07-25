@@ -14,29 +14,78 @@ import boto3
 from botocore.exceptions import ClientError
 import requests
 from pinecone import PineconeException
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
+from typing import List
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "chatbot-index")
-# BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
-BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
+# BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+topk = 3
 
 # Use host.docker.internal to refer to the host machine from within the container
 FILE_ID_SERVICE_URL = "http://host.docker.internal:8001"
+
+MIN_QUERY_LENGTH = 10  # Minimum number of characters for a query
+MAX_RETRIES = 3
+EMBEDDING_DIMENSION = 1536
 
 
 dynamodb = boto3.resource("dynamodb")
 processedFilesTable = dynamodb.Table("lewas-chatbot-processed-files")
 queriesTable = dynamodb.Table("RagCdkInfraStack-QueriesTable7395E8FA-17BGT2YQ1QX1F")
 
+# PROMPT_TEMPLATE = """
+# Context information:
+# {context}
+
+# Human query: {question}
+
+# AI Assistant: You are an AI-assisted chatbot developed for the Learning Enhanced Watershed Assessment System (LEWAS) lab at Virginia Tech. Your purpose is to provide efficient access to LEWAS information, assisting with onboarding new students and answering queries about the lab's vast amount of data and research publications. Use the following guidelines to formulate your response:
+
+# 1. Directly address the user's query using the provided context and your knowledge about LEWAS.
+# 2. Focus on providing information about LEWAS operations, research, environmental data, and related topics.
+# 3. If asked about the lab's history or scope, mention that LEWAS has accumulated data and research publications from undergraduate and graduate students across various departments for over a decade.
+# 4. When discussing technical aspects of LEWAS research or data, aim for clarity and accessibility in your explanations.
+# 5. If the query relates to onboarding or learning about LEWAS, emphasize how you can help provide interactive and efficient access to information.
+# 6. For questions about environmental monitoring or watershed assessment, provide relevant information from the LEWAS context.
+# 7. If asked about your own capabilities, you can briefly mention that you use natural language processing, AWS services, and a vector database to process queries and retrieve information.
+# 8. If the query is unclear or outside the scope of LEWAS information, politely ask for clarification.
+# 9. Maintain a helpful and educational tone, suitable for assisting students and researchers at various levels of familiarity with LEWAS.
+# 10. If you're unsure about any specific details, it's okay to say so and suggest where the user might find more information within the LEWAS resources.
+
+# Now, please provide a clear, informative response to the query:
+# """
+
+# PROMPT_TEMPLATE = """
+# Context: {context}
+
+# Query: {question}
+
+# You are an AI chatbot for the LEWAS (Learning Enhanced Watershed Assessment System) lab at Virginia Tech. Provide accurate answers about LEWAS research, data, and operations. Use the context provided. If unsure, say so. Keep responses clear and suitable for students and researchers.
+
+# Response:
+# """
 
 PROMPT_TEMPLATE = """
-Answer the question based only on the following context:
+Context: {context}
 
-{context}
+Query: {question}
 
----
+You are an AI chatbot for the LEWAS (Learning Enhanced Watershed Assessment System) lab at Virginia Tech. Your role:
 
-Answer the question based on the above context: {question}
+1. Provide accurate information about LEWAS research, data, and operations.
+2. Use ONLY the provided context to answer queries.
+4. Keep responses informative.
+5. If unsure, admit it and suggest where to find more information.
+6. Maintain a tone suitable for students and researchers.
+
+Answer the query based on these guidelines:
 """
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -133,53 +182,128 @@ def create_embeddings(sentences):
         )
 
 
-def query_pinecone(query_text, top_k=7):
+# Helper function to get embedding
+@retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+)
+def get_embedding(query_text: str) -> List[float]:
+    embedding_function = get_embedding_function()
+    embedding = embedding_function.embed_query(query_text)
+    if not embedding or len(embedding) != EMBEDDING_DIMENSION:
+        raise ValueError("Failed to generate valid embedding")
+    return embedding
+
+
+@retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+)
+def perform_pinecone_query(vector: List[float], top_k: int) -> List[dict]:
+    index = pc.Index(PINECONE_INDEX_NAME)
+    results = index.query(vector=vector, top_k=top_k, include_metadata=True)
+    logging.info(f"Pinecone query results: {results}")  # Log the entire results object
+    if not results.matches:
+        logging.info("No matches found in Pinecone query results")
+        return []  # Return an empty list instead of raising an exception
+    return results.matches
+
+
+# Main query function
+def query_pinecone(query_text: str, top_k: int = topk) -> QueryModel:
+    query_model = QueryModel(query_text=query_text)
+
     try:
-        index = pc.Index(PINECONE_INDEX_NAME)
+        # Input validation
+        if len(query_text.strip()) < MIN_QUERY_LENGTH:
+            query_model.answer_text = f"Your query is too short. Please provide a query with at least {MIN_QUERY_LENGTH} characters."
+            query_model.is_complete = False
+            return query_model
 
-        embedding_function = get_embedding_function()
-        query_embedding = embedding_function.embed_query(query_text)
+        # Get embedding
+        try:
+            logging.info(f"Generating embedding for query: {query_text}")
+            query_embedding = get_embedding(query_text)
+            logging.info(
+                f"Embedding generated successfully. Dimension: {len(query_embedding)}"
+            )
+        except Exception as e:
+            logging.error(f"Embedding creation failed: {str(e)}", exc_info=True)
+            query_model.answer_text = (
+                "Unable to process your query. Please try rephrasing it."
+            )
+            query_model.is_complete = False
+            return query_model
 
-        results = index.query(
-            vector=query_embedding, top_k=top_k, include_metadata=True
-        )
+        # Query Pinecone
+        try:
+            logging.info(f"Querying Pinecone with top_k={top_k}")
+            matches = perform_pinecone_query(query_embedding, top_k)
+            logging.info(f"Received {len(matches)} matches from Pinecone")
+        except Exception as e:
+            logging.error(f"Pinecone query failed: {str(e)}", exc_info=True)
+            query_model.answer_text = "An error occurred while searching for relevant information. Please try again later."
+            query_model.is_complete = False
+            return query_model
+
+        # Process results
+        if not matches:
+            logging.info(f"No matches found for query: {query_text}")
+            query_model.answer_text = "No relevant results found. Please try rephrasing your query or using different keywords."
+            query_model.is_complete = False
+            return query_model
 
         context_text = "\n\n---\n\n".join(
-            [match.metadata["text"] for match in results.matches]
+            [
+                match.metadata.get("text", "")
+                for match in matches
+                if "text" in match.metadata
+            ]
         )
-
-        prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-        prompt = prompt_template.format(context=context_text, question=query_text)
-
-        model = ChatBedrock(model_id=BEDROCK_MODEL_ID)
-        response = model.invoke(prompt)
-        response_text = response.content
-
-        # Create a list of strings for sources
-        sources = [
-            f"{match.metadata['source']} (Page {match.metadata.get('page', 'N/A')}) - {match.metadata.get('google_drive_link', 'No link available')}"
-            for match in results.matches
+        query_model.sources = [
+            f"{match.metadata.get('source', 'Unknown')} (Page {match.metadata.get('page', 'N/A')}) - {match.metadata.get('google_drive_link', 'No link available')}"
+            for match in matches
         ]
 
-        new_query = QueryModel(
-            query_id=uuid.uuid4().hex,
-            create_time=int(time.time()),
-            query_text=query_text,
-            answer_text=response_text,
-            sources=sources,
-            is_complete=True,
-        )
-        # queriesTable.put_item(new_query)
-        queriesTable.put_item(Item=new_query.model_dump())
+        # Generate response using AI model
+        try:
+            logging.info("Generating AI response")
+            prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+            prompt = prompt_template.format(context=context_text, question=query_text)
+            model = ChatBedrock(model_id=BEDROCK_MODEL_ID)
+            response = model.invoke(prompt)
+            query_model.answer_text = response.content
+            query_model.is_complete = True
+            logging.info("AI response generated successfully")
+        except Exception as e:
+            logging.error(f"Error generating AI response: {str(e)}", exc_info=True)
+            query_model.answer_text = "An error occurred while generating the response. Please try again later."
+            query_model.is_complete = False
 
-        logging.info(f"Query processed successfully: {new_query.query_id}")
+        return query_model
 
-        return new_query
     except Exception as e:
-        logging.error(f"Failed to query Pinecone: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to query Pinecone: {str(e)}"
+        logging.error(f"Unexpected error in query_pinecone: {str(e)}", exc_info=True)
+        query_model.answer_text = (
+            "An unexpected error occurred. Please try again later."
         )
+        query_model.is_complete = False
+        return query_model
+
+
+# Function to save query result to database
+def save_query_result(query_model: QueryModel):
+    try:
+        query_model.put_item()
+    except Exception as e:
+        logging.error(f"Error saving query result to database: {str(e)}")
+
+
+# Main handler function
+def handle_query(query_text: str) -> dict:
+    query_model = query_pinecone(query_text)
+    save_query_result(query_model)
+    return query_model.dict()
 
 
 def process_resume_pdf():

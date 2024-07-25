@@ -18,3 +18,9 @@ cdk bootstrap --region us-east-1
 cdk deploy
 
 Errors faced and ways to 
+
+{
+  "query_text": "When did the world war 2 started?",
+  "teacher_name": "drvinay",
+  "target_language": "english"
+}
