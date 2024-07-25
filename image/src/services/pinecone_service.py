@@ -280,6 +280,14 @@ def query_pinecone(query_text: str, top_k: int = topk) -> QueryModel:
             query_model.answer_text = "An error occurred while generating the response. Please try again later."
             query_model.is_complete = False
 
+        # Save the successful query to the database
+        try:
+            save_query_result(query_model)
+            logging.info(f"Query saved successfully: {query_text}")
+        except Exception as e:
+            logging.error(f"Failed to save query to database: {str(e)}")
+            # Note: We're not returning here because the query itself was successful
+
         return query_model
 
     except Exception as e:
