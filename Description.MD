@@ -144,16 +144,3 @@ This research is supported by NSF-IUSE grant #1915268. Any opinions, findings, a
 
 ## REFERENCES
 
-[Note: As an AI language model, I don't have access to the specific references used in this project. The following are placeholder references that should be replaced with actual sources used in the development of the LEWAS chatbot.]
-
-1. Lohani, V. K., et al. (2023). "LEWAS: An Interdisciplinary Approach to Environmental Monitoring and Education." Journal of Environmental Engineering Education, 45(2), 123-135.
-
-2. Smith, J., & Johnson, M. (2024). "Implementing AI Chatbots in Educational Settings: Challenges and Opportunities." International Journal of AI in Education, 12(1), 45-60.
-
-3. Brown, A., et al. (2023). "Vector Databases for Efficient Information Retrieval in Environmental Science." Environmental Data Science, 8(3), 301-315.
-
-4. Garcia, R. (2024). "Retrieval-Augmented Generation in Scientific Chatbots: A Case Study." Proceedings of the International Conference on AI in Science and Engineering, 78-92.
-
-5. AWS Documentation. (2024). "AWS Services for Building Scalable AI Applications." Amazon Web Services, Inc.
-
-[Additional references should be added based on the actual sources used in the development of the LEWAS chatbot and the writing of this manuscript.]
