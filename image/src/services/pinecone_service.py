@@ -26,6 +26,7 @@ PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "chatbot-index")
 # BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
 BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+# BEDROCK_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0" - potential error
 topk = 7
 
 # Use host.docker.internal to refer to the host machine from within the container
