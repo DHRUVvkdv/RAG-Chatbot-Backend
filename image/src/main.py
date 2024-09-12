@@ -1,9 +1,7 @@
 import os
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
-from utils.api_key_middleware import ApiKeyMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.openapi.docs import get_swagger_ui_html
 from mangum import Mangum
 from pydantic import BaseModel
 from models.query import QueryModel
@@ -21,11 +19,28 @@ from services.pinecone_service import (
 from utils.s3_handler import get_s3_buckets, list_pdfs_in_s3
 import logging
 from pinecone import PineconeException
-
+from fastapi.middleware.cors import CORSMiddleware
+from utils.api_key_middleware import ApiKeyMiddleware
 
 WORKER_LAMBDA_NAME = os.environ.get("WORKER_LAMBDA_NAME", None)
 
 app = FastAPI()
+
+# Configure CORS middleware first
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://main.dwpq6cvgl2x93.amplifyapp.com",
+        "https://basicapppush.dwpq6cvgl2x93.amplifyapp.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Add custom API key middleware after CORS middleware
+app.add_middleware(ApiKeyMiddleware)
 
 
 def custom_openapi():
@@ -46,7 +61,6 @@ def custom_openapi():
 
 
 app.openapi = custom_openapi
-app.add_middleware(ApiKeyMiddleware)
 handler = Mangum(app)  # Entry point for AWS Lambda.
 
 
@@ -97,6 +111,11 @@ def process_all_pdfs_endpoint():
 @app.post("/query_documents")
 def query_documents_endpoint(request: SubmitQueryRequest) -> QueryModel:
     return query_pinecone(request.query_text)
+
+
+@app.options("/query_documents")
+async def options_query_documents():
+    return {"message": "OK"}
 
 
 @app.get("/list_processed_files")

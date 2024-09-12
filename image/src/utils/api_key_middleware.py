@@ -8,11 +8,12 @@ API_KEY = os.environ.get("API_KEY")
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in [
-            "/docs",
-            "/openapi.json",
-        ]:  # Skip authentication for Swagger docs
+        if request.method == "OPTIONS":
             return await call_next(request)
+
+        if request.url.path in ["/docs", "/openapi.json"]:
+            return await call_next(request)
+
         api_key = request.headers.get("API-Key")
         if api_key != API_KEY:
             return JSONResponse(
