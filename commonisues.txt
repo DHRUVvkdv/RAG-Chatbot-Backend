@@ -1,0 +1,5 @@
+how may publications, what year. 
+Call DB again with if answer not satisfactory:
+or ask ai to pharase different questions (maybe learn from time) and then send to DB\
+also implement the OWLS fucntion calling for data.
+implment analyzer for the maximum file used. 
