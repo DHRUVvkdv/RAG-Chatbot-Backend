@@ -7,6 +7,10 @@ docker build -t aws_rag_app .
 docker run --rm -p 8000:8000 --add-host=host.docker.internal:host-gateway --entrypoint python --env-file .env aws_rag_app main.py
 docker run --rm -p 8000:8000 --entrypoint python --env-file .env aws_rag_app main.py
 
+docker build -t lewas_chatbot .
+docker run --rm -p 8000:8000 --add-host=host.docker.internal:host-gateway --entrypoint python --env-file .env lewas_chatbot main.py
+docker run --rm -p 8000:8000 --entrypoint python --env-file .env lewas_chatbot main.py
+
 cdk init app --language=typescript
 
 cdk bootstrap --region us-east-1
