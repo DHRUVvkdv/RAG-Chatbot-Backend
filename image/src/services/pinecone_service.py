@@ -25,10 +25,22 @@ from typing import List
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME")
+# Activated this on 2025-04-18 on LEWAS AWS account
+# BEDROCK_MODEL_ID = "meta.llama3-1-8b-instruct-v1:0"
+# doesnt work ->
 # BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
-BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+# doesnt work because of this error:
+# ValueError: Error raised by bedrock service: An error occurred (ValidationException) when calling the InvokeModel operation: Invocation of model ID meta.llama3-2-3b-instruct-v1:0 with on-demand throughput isn’t supported. Retry your request with the ID or ARN of an inference profile that contains this model.
+# ERROR:models.query:ClientError in put_item: Requested resource not found
+# BEDROCK_MODEL_ID = "meta.llama3-2-3b-instruct-v1:0"
+# BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 # BEDROCK_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0" - potential error
 topk = 7
+
+# Currently working models:
+# BEDROCK_MODEL_ID = "meta.llama3-8b-instruct-v1:0"
+BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+
 
 # Use host.docker.internal to refer to the host machine from within the container
 FILE_ID_SERVICE_URL = "http://host.docker.internal:8001"
