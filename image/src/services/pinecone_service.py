@@ -35,7 +35,7 @@ FILE_ID_SERVICE_URL = "http://host.docker.internal:8001"
 
 MIN_QUERY_LENGTH = 10  # Minimum number of characters for a query
 MAX_RETRIES = 3
-EMBEDDING_DIMENSION = 1536
+EMBEDDING_DIMENSION = 1024
 
 
 dynamodb = boto3.resource("dynamodb")
@@ -150,7 +150,7 @@ def initialize_pinecone():
         if PINECONE_INDEX_NAME not in pc.list_indexes().names():
             pc.create_index(
                 name=PINECONE_INDEX_NAME,
-                dimension=1536,
+                dimension=1024,
                 metric="cosine",
                 spec=ServerlessSpec(cloud="aws", region="us-east1-free"),
             )
@@ -484,7 +484,7 @@ def update_missing_drive_links():
     while True:
         try:
             query_response = index.query(
-                vector=[0] * 1536,
+                vector=[0] * 1024,
                 top_k=batch_size,
                 include_metadata=True,
                 include_values=True,
@@ -549,7 +549,7 @@ def update_drive_link_for_file(file_name: str, drive_link: str):
 
         # Query for vectors with the given file name
         query_response = index.query(
-            vector=[0] * 1536,  # Use a zero vector for querying
+            vector=[0] * 1024,  # Use a zero vector for querying
             top_k=10000,
             include_metadata=True,
             include_values=True,  # Include vector values in the response
