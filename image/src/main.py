@@ -15,6 +15,7 @@ from services.pinecone_service import (
     get_google_drive_link_pdf,
     update_missing_drive_links,
     update_drive_link_for_file,
+    delete_all_vectors,
 )
 from utils.s3_handler import get_s3_buckets, list_pdfs_in_s3
 import logging
@@ -205,6 +206,34 @@ async def update_drive_link_endpoint(
         logging.error(f"Unexpected error: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error updating Google Drive link: {str(e)}"
+        )
+
+
+@app.delete("/embeddings/delete-all", operation_id="delete_all_embeddings_endpoint")
+async def delete_all_embeddings_endpoint():
+    """
+    Delete all embeddings from the Pinecone index.
+    """
+    try:
+        result = delete_all_vectors()
+        if result["status"] == "success":
+            return {
+                "status": "success",
+                "message": "Successfully deleted all embeddings",
+                **result,  # Include any additional data from the result
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"Failed to delete embeddings: {result.get('message', 'Unknown error')}",
+            }
+    except PineconeException as e:
+        logging.error(f"Pinecone exception: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pinecone error: {str(e)}")
+    except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting embeddings: {str(e)}"
         )
 
 

@@ -13,6 +13,7 @@ from utils.pdf_processor import process_pdf
 import boto3
 from botocore.exceptions import ClientError
 import requests
+from typing import Dict, Any
 from pinecone import PineconeException
 from tenacity import (
     retry,
@@ -587,3 +588,43 @@ def update_drive_link_for_file(file_name: str, drive_link: str):
     except Exception as e:
         logging.error(f"Failed to update drive link for {file_name}: {str(e)}")
         raise
+
+
+def delete_all_vectors() -> Dict[str, Any]:
+    """
+    Delete all vectors in the Pinecone index.
+
+    Returns:
+        Dict[str, Any]: Response from Pinecone delete operation
+    """
+    try:
+        # Initialize Pinecone index
+        index = pc.Index(PINECONE_INDEX_NAME)
+
+        # Get all vector IDs from the index
+        # Using a small batch size for the query to retrieve IDs
+        query_response = index.query(
+            vector=[0] * 1024,  # Dummy vector with the correct dimension
+            top_k=10000,  # Maximum number of results
+            include_metadata=False,
+            include_values=False,
+        )
+
+        # Extract all IDs
+        ids_to_delete = [match.id for match in query_response.matches]
+
+        # If there are no vectors, return early
+        if not ids_to_delete:
+            return {"status": "success", "message": "No vectors found to delete"}
+
+        # Delete all vectors by their IDs
+        delete_response = index.delete(ids=ids_to_delete)
+
+        return {
+            "status": "success",
+            "message": f"Successfully deleted {len(ids_to_delete)} vectors",
+            "response": delete_response,
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
