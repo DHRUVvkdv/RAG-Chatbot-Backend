@@ -5,8 +5,12 @@ from typing import Dict, Any
 from models.query import QueryModel
 from services.pinecone_service import query_pinecone
 from services.live_data_service import LiveDataService
+from services.visualization_service import VisualizationService
 from datetime import datetime
 import pytz
+import boto3
+import os
+import uuid
 
 # Import model ID from pinecone service
 from services.pinecone_service import BEDROCK_MODEL_ID
@@ -150,42 +154,61 @@ def handle_live_data_query(query_text: str, params: Dict[str, str]) -> QueryMode
 
 
 def handle_visualization_query(query_text: str, params: Dict[str, str]) -> QueryModel:
-    """Handle visualization queries (placeholder for now)."""
+    """Handle visualization queries by generating and returning graph links."""
     query_model = QueryModel(query_text=query_text)
 
     try:
+        # Initialize services
+        vis_service = VisualizationService()
+
+        # Extract parameters
         medium = params.get("medium", "air")
         metric = params.get("metric", "temperature")
 
-        # Placeholder for now
-        query_model.answer_text = (
-            f"You requested a visualization of {medium} {metric} data. "
-            f"This feature is coming soon! For now, I can provide you with the latest readings."
+        # Initialize DynamoDB connection
+        dynamodb = boto3.resource("dynamodb")
+        table_name = os.environ.get("DYNAMODB_TABLE_NAME", "lewas-observations")
+        table = dynamodb.Table(table_name)
+
+        # Get data for visualization (last 24 hours)
+        instrument_id = "3"  # Assuming this is the ID stored in DynamoDB
+        data = vis_service.get_data_for_timeframe(
+            table, instrument_id, medium, metric, hours=24
         )
 
-        # Fall back to live data
-        service = LiveDataService()
-        readings = service.get_latest_readings(medium=medium, metric=metric, limit=10)
-
-        if readings:
-            response_text = (
-                query_model.answer_text + "\n\nHere are the latest readings:\n\n"
+        if not data:
+            query_model.answer_text = (
+                f"I couldn't find any {medium} {metric} data from the past 24 hours to visualize. "
+                f"Would you like to see the latest readings instead?"
             )
+            query_model.is_complete = True
+            return query_model
 
-            for reading in readings:
-                eastern_tz = pytz.timezone("US/Eastern")
-                timestamp_utc = datetime.fromisoformat(
-                    formatted_reading["timestamp"].replace("Z", "+00:00")
-                )
-                timestamp_est = timestamp_utc.astimezone(eastern_tz)
-                formatted_time = timestamp_est.strftime("%Y-%m-%d %H:%M:%S EST")
-                value = reading["value"]
-                unit = reading["unit"]
+        # Generate query ID if not already set
+        if not query_model.query_id:
+            query_model.query_id = str(uuid.uuid4())
 
-                response_text += f"- {formatted_time}: {value} {unit}\n"
+        # Create visualization and get URL
+        graph_url = vis_service.create_visualization(
+            medium, metric, data, query_model.query_id
+        )
 
-            query_model.answer_text = response_text
+        if not graph_url:
+            query_model.answer_text = (
+                f"I was unable to generate a visualization for the {medium} {metric} data. "
+                f"Here's a summary instead: There are {len(data)} data points available from the past 24 hours."
+            )
+            query_model.is_complete = True
+            return query_model
 
+        # Format the response with the graph URL
+        response_text = (
+            f"Here's a visualization of the {medium} {metric} data from the LEWAS weather station over the past 24 hours:\n\n"
+            f"![{medium.capitalize()} {metric.capitalize()} Graph]({graph_url})\n\n"
+            f"This graph shows the trend of {len(data)} data points. The URL will expire in 24 hours."
+        )
+
+        query_model.answer_text = response_text
         query_model.sources = [
             f"Live data from LEWAS weather station ({medium}/{metric})"
         ]
@@ -194,7 +217,7 @@ def handle_visualization_query(query_text: str, params: Dict[str, str]) -> Query
     except Exception as e:
         logging.error(f"Error handling visualization query: {str(e)}")
         query_model.answer_text = (
-            f"An error occurred while processing your visualization request: {str(e)}"
+            f"An error occurred while generating the visualization: {str(e)}"
         )
         query_model.is_complete = False
 

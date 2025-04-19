@@ -37,6 +37,9 @@ class Config:
 
     WEATHER_API_URL = os.getenv("WEATHER_API_URL", "")
     WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
+    S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+    AWS_REGION = os.getenv("AWS_REGION")
+    DYNAMODB_TABLE_NAME = os.getenv("DYNAMODB_TABLE_NAME")
 
     # FastAPI Configuration
     API_PORT = int(os.getenv("API_PORT", 8000))

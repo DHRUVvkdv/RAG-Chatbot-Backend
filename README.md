@@ -11,6 +11,8 @@ docker build -t lewas_chatbot .
 docker run --rm -p 8000:8000 --add-host=host.docker.internal:host-gateway --entrypoint python --env-file .env lewas_chatbot main.py
 docker run --rm -p 8000:8000 --entrypoint python --env-file .env lewas_chatbot main.py
 
+docker cp 681844105c8b:/tmp/86af6dbb5fce4a3991c4e3b914548c39_air_temperature_ee5a8704.png ./
+
 cdk init app --language=typescript
 
 cdk bootstrap --region us-east-1
