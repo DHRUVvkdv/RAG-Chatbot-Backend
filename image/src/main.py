@@ -243,6 +243,20 @@ async def delete_all_embeddings_endpoint():
         )
 
 
+@app.post("/classify_query")
+def classify_query_endpoint(request: SubmitQueryRequest) -> dict:
+    """
+    Returns the classification of a query without processing it.
+    """
+    query_text = request.query_text
+    query_type = classify_query(query_text)
+
+    return {
+        "query_type": query_type,
+        "classification": query_type.split(":")[0] if ":" in query_type else query_type,
+    }
+
+
 @app.post("/smart_query")
 def smart_query_endpoint(request: SubmitQueryRequest) -> QueryModel:
     """
