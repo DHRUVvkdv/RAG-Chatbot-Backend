@@ -640,3 +640,104 @@ def delete_all_vectors() -> Dict[str, Any]:
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def classify_query(query_text: str) -> str:
+    """
+    Use LLM to classify the query and determine which handler to use.
+    Returns:
+    - "LIVE_DATA:medium:metric" for live data queries
+    - "VISUALIZATION:medium:metric" for visualization queries
+    - "RAG" for document-based queries
+    """
+    CLASSIFICATION_PROMPT = """
+    You are an AI assistant for the LEWAS lab at Virginia Tech. 
+    Determine if this query requires:
+    
+    1. Live weather station data (asking about current temperature, humidity, pressure, etc.)
+    2. Visualization of weather data (asking for graphs, charts, trends)
+    3. Document-based information (asking about LEWAS lab, research, operations, etc.)
+    
+    Query: {question}
+    
+    Respond ONLY with one of these formats:
+    - LIVE_DATA:medium:metric (e.g., LIVE_DATA:air:temperature)
+    - VISUALIZATION:medium:metric (e.g., VISUALIZATION:air:humidity)
+    - RAG
+    """
+
+    try:
+        prompt_template = ChatPromptTemplate.from_template(CLASSIFICATION_PROMPT)
+        prompt = prompt_template.format(question=query_text)
+        model = ChatBedrock(model_id=BEDROCK_MODEL_ID)
+        response = model.invoke(prompt)
+        return response.content.strip()
+    except Exception as e:
+        logging.error(f"Error classifying query: {str(e)}")
+        return "RAG"  # Default to RAG on error
+
+
+def handle_live_data_query(query_text: str, params: dict) -> QueryModel:
+    """Handle live data queries by fetching recent sensor readings."""
+    query_model = QueryModel(query_text=query_text)
+
+    try:
+        # Extract parameters
+        medium = params.get("medium", "air")
+        metric = params.get("metric", "temperature")
+
+        # Create a simple response for testing
+        # In the actual implementation, you would call your API here
+        mock_data = [
+            {"timestamp": "2025-04-18T12:30:00Z", "value": "21.5", "unit": "°C"},
+            {"timestamp": "2025-04-18T12:20:00Z", "value": "21.3", "unit": "°C"},
+            {"timestamp": "2025-04-18T12:10:00Z", "value": "21.2", "unit": "°C"},
+        ]
+
+        # Format the response
+        response_text = f"Here are the latest {medium} {metric} readings from the LEWAS weather station:\n\n"
+
+        for reading in mock_data:
+            timestamp = reading["timestamp"]
+            value = reading["value"]
+            unit = reading["unit"]
+
+            response_text += f"- {timestamp}: {value} {unit}\n"
+
+        query_model.answer_text = response_text
+        query_model.is_complete = True
+
+    except Exception as e:
+        logging.error(f"Error handling live data query: {str(e)}")
+        query_model.answer_text = (
+            f"An error occurred while processing your request: {str(e)}"
+        )
+        query_model.is_complete = False
+
+    return query_model
+
+
+def handle_visualization_query(query_text: str, params: dict) -> QueryModel:
+    """Handle visualization queries by generating and returning graph links."""
+    query_model = QueryModel(query_text=query_text)
+
+    try:
+        medium = params.get("medium", "air")
+        metric = params.get("metric", "temperature")
+
+        # Placeholder for now
+        query_model.answer_text = (
+            f"You requested a visualization of {medium} {metric} data. "
+            f"This would generate a graph of historical readings. "
+            f"Implementation in progress."
+        )
+        query_model.is_complete = True
+
+    except Exception as e:
+        logging.error(f"Error handling visualization query: {str(e)}")
+        query_model.answer_text = (
+            f"An error occurred while processing your visualization request: {str(e)}"
+        )
+        query_model.is_complete = False
+
+    return query_model

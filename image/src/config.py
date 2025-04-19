@@ -35,6 +35,9 @@ class Config:
         "FILE_ID_SERVICE_URL", "http://host.docker.internal:8001"
     )
 
+    WEATHER_API_URL = os.getenv("WEATHER_API_URL", "")
+    WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
+
     # FastAPI Configuration
     API_PORT = int(os.getenv("API_PORT", 8000))
 

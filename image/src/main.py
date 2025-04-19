@@ -17,6 +17,12 @@ from services.pinecone_service import (
     update_drive_link_for_file,
     delete_all_vectors,
 )
+from services.query_router_service import (
+    classify_query,
+    extract_query_params,
+    handle_live_data_query,
+    handle_visualization_query,
+)
 from utils.s3_handler import get_s3_buckets, list_pdfs_in_s3
 import logging
 from pinecone import PineconeException
@@ -235,6 +241,27 @@ async def delete_all_embeddings_endpoint():
         raise HTTPException(
             status_code=500, detail=f"Error deleting embeddings: {str(e)}"
         )
+
+
+@app.post("/smart_query")
+def smart_query_endpoint(request: SubmitQueryRequest) -> QueryModel:
+    """
+    Smart router that determines whether to use RAG, live data, or visualization
+    based on query content.
+    """
+    query_text = request.query_text
+    query_type = classify_query(query_text)
+
+    if query_type.startswith("LIVE_DATA"):
+        # Extract parameters from query type
+        params = extract_query_params(query_type)
+        return handle_live_data_query(query_text, params)
+    elif query_type.startswith("VISUALIZATION"):
+        # Extract parameters from query type
+        params = extract_query_params(query_type)
+        return handle_visualization_query(query_text, params)
+    else:  # Default to RAG
+        return query_pinecone(query_text)
 
 
 if __name__ == "__main__":
