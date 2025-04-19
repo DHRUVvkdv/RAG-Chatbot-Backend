@@ -35,6 +35,14 @@ export class ChatbotInfraStack extends cdk.Stack {
     if (!pineconeIndexName) { 
       throw new Error("PINECONE_INDEX_NAME environment variable is not set");
     }
+    const s3BucketName = process.env.S3_BUCKET;
+    if (!s3BucketName) {
+      throw new Error("S3_BUCKET environment variable is not set");
+    }
+    const lewasObservationsTable = process.env.DYNAMODB_TABLE_NAME;
+    if (!lewasObservationsTable) {
+      throw new Error("DYNAMODB_TABLE_NAME environment variable is not set");
+    }
 
     // Create a DynamoDB table to store the query data and results.
     // const ragQueryTable = new Table(this, "QueriesTable", {
@@ -44,7 +52,7 @@ export class ChatbotInfraStack extends cdk.Stack {
     
     // Using the table already created in the previous step.
     const ragQueryTable = Table.fromTableName(this, "ExistingQueriesTable", "lewas-chatbot-queries");
-
+    const observationsTable = Table.fromTableName(this, "ExistingObservationsTable", lewasObservationsTable);
     // Create a new DynamoDB table for processed files
     // const processedFilesTable = new Table(this, "ProcessedFilesTable", {
     //   tableName: "lewas-chatbot-processed-files",
@@ -54,7 +62,7 @@ export class ChatbotInfraStack extends cdk.Stack {
 
     const PROCESSED_FILES_TABLE_NAME = process.env.PROCESSED_FILES_TABLE_NAME;
     if (!PROCESSED_FILES_TABLE_NAME) {
-      throw new Error("DYNAMODB_TABLE_NAME_ANIMAL environment variable is not set");
+      throw new Error("PROCESSED_FILES_TABLE_NAME environment variable is not set");
     }
     const processedFilesTable = dynamodb.Table.fromTableName(this, 'lewas-chatbot-processed-files', PROCESSED_FILES_TABLE_NAME);
 
@@ -72,6 +80,8 @@ export class ChatbotInfraStack extends cdk.Stack {
         PINECONE_API_KEY: pineconeApiKey,
         API_KEY: apiKey,
         PINECONE_INDEX_NAME: pineconeIndexName,
+        S3_BUCKET: s3BucketName,
+        DYNAMODB_TABLE_NAME: lewasObservationsTable,
       },
     });
 
@@ -106,7 +116,7 @@ export class ChatbotInfraStack extends cdk.Stack {
 
 
     // Add S3 environment variables to both functions
-    apiFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot-v2');
+    // apiFunction.addEnvironment('S3_BUCKET', 'lewas-chatbot-v2');
 
     apiFunction.role?.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess")
@@ -136,6 +146,7 @@ export class ChatbotInfraStack extends cdk.Stack {
     // Grant permissions for all resources to work together.
     ragQueryTable.grantReadWriteData(apiFunction);
     processedFilesTable.grantReadWriteData(apiFunction);
+    observationsTable.grantReadWriteData(apiFunction);
 
     // Output the URL for the API function.
     new cdk.CfnOutput(this, "FunctionUrl", {
