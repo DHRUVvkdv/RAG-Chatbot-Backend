@@ -95,10 +95,12 @@ def handle_live_data_query(query_text: str, params: Dict[str, str]) -> QueryMode
 
             # Format for output
             formatted_reading = service.format_reading(reading)
-            timestamp = datetime.fromisoformat(
+            eastern_tz = pytz.timezone("US/Eastern")
+            timestamp_utc = datetime.fromisoformat(
                 formatted_reading["timestamp"].replace("Z", "+00:00")
             )
-            formatted_time = timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+            timestamp_est = timestamp_utc.astimezone(eastern_tz)
+            formatted_time = timestamp_est.strftime("%Y-%m-%d %H:%M:%S EST")
 
             response_text = f"The latest {medium} {metric} reading from the LEWAS weather station is:\n\n"
             response_text += f"{formatted_reading['value']} {formatted_reading['unit']} (recorded at {formatted_time})"
@@ -121,10 +123,12 @@ def handle_live_data_query(query_text: str, params: Dict[str, str]) -> QueryMode
 
             for reading in readings:
                 formatted_reading = service.format_reading(reading)
-                timestamp = datetime.fromisoformat(
+                eastern_tz = pytz.timezone("US/Eastern")
+                timestamp_utc = datetime.fromisoformat(
                     formatted_reading["timestamp"].replace("Z", "+00:00")
                 )
-                formatted_time = timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+                timestamp_est = timestamp_utc.astimezone(eastern_tz)
+                formatted_time = timestamp_est.strftime("%Y-%m-%d %H:%M:%S EST")
 
                 response_text += f"- {formatted_time}: {formatted_reading['value']} {formatted_reading['unit']}\n"
 
@@ -169,10 +173,12 @@ def handle_visualization_query(query_text: str, params: Dict[str, str]) -> Query
             )
 
             for reading in readings:
-                timestamp = datetime.fromisoformat(
-                    reading["timestamp"].replace("Z", "+00:00")
+                eastern_tz = pytz.timezone("US/Eastern")
+                timestamp_utc = datetime.fromisoformat(
+                    formatted_reading["timestamp"].replace("Z", "+00:00")
                 )
-                formatted_time = timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+                timestamp_est = timestamp_utc.astimezone(eastern_tz)
+                formatted_time = timestamp_est.strftime("%Y-%m-%d %H:%M:%S EST")
                 value = reading["value"]
                 unit = reading["unit"]
 
